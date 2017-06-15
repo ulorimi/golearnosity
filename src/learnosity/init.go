@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -121,7 +120,6 @@ func generateSignature(service string, packet map[string]interface{}, secret, re
 
 func hashValue(values []string) string {
 	valueString := strings.Join(values, "_")
-	fmt.Println(valueString)
 	hash := sha256.New()
 	hash.Write([]byte(valueString))
 	return hex.EncodeToString(hash.Sum(nil))
@@ -143,9 +141,7 @@ func toVals(packet map[string]interface{}) url.Values {
 	vals := url.Values{}
 	for k := range packet {
 		val := packet[k].(string)
-		fmt.Println(val)
 		val = strings.Replace(val, "\\", "", -1)
-		fmt.Println(val)
 		vals[k] = []string{val}
 	}
 	return vals
