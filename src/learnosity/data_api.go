@@ -2,116 +2,37 @@ package learnosity
 
 import (
 	"encoding/json"
-	"errors"
+	"io/ioutil"
+	"net/http"
 )
 
-//DataAPI used to make requests to the learnosity data api
-type DataAPI struct {
-	params         map[string]interface{}
-	remote         *Remote
-	request        *Request
-	url            string
-	secJSON        map[string]string
-	requestPacket  map[string]interface{}
-	requestString  string
-	securityPacket SecurityPacket
-	action         string
-	secret         string
-}
+//MakeDataRequest calls a Learnosity data api with the provided init data.
+//Get initData by calling Init with the proper security and request info
+func MakeDataRequest(url string, initData map[string]interface{}) (DataResult, error) {
+	result := DataResult{}
 
-//NewDataAPI initializes a new DataAPI with the given url, securityPacket, secret and optional requestPack and action
-func NewDataAPI(url string, securityPacket SecurityPacket, secret string, requestPacket *map[string]interface{}, action *string) error {
-	api := &DataAPI{}
-	api.remote = NewRemote()
-	api.url = url
-	api.securityPacket = securityPacket
-	api.secret = secret
-	if action != nil {
-		api.action = *action
-	}
-	if requestPacket != nil {
-		api.requestPacket = *requestPacket
-	}
-	return nil
-}
+	vals := toVals(initData)
+	client := http.DefaultClient
 
-//Request make the post request
-func (api *DataAPI) Request() (*Remote, error) {
-	api.params = map[string]interface{}{}
-	secString := ""
-	if api.action == "" {
-		request, err := NewRequest("data", api.securityPacket, api.secret, nil)
-		if err != nil {
-			return nil, err
-		}
-		api.request = request
-		secJSON := map[string]string{}
-
-		secString = api.request.Generate()
-		err = json.Unmarshal([]byte(secString), &secJSON)
-		if err != nil {
-			return nil, err
-		}
-		api.secJSON = secJSON
-	}
-
-	if api.action != "" && api.requestString == "" {
-		request, err := NewRequest("data", api.securityPacket, api.secret, nil)
-		if err != nil {
-			return nil, err
-		}
-		api.request = request
-		secJSON := map[string]string{}
-		secString = api.request.Generate()
-		err = json.Unmarshal([]byte(secString), &secJSON)
-		if err != nil {
-			return nil, err
-		}
-		api.secJSON = secJSON
-	}
-
-	if api.action != "" && api.requestString != "" {
-		request, err := NewRequest("data", api.securityPacket, api.secret, &api.requestPacket)
-		if err != nil {
-			return nil, err
-		}
-		api.request = request
-		secJSON := map[string]string{}
-		secString = api.request.Generate()
-		err = json.Unmarshal([]byte(secString), &secJSON)
-		if err != nil {
-			return nil, err
-		}
-		api.params["action"] = api.action
-		api.params["request"] = api.requestString
-		api.secJSON = secJSON
-	}
-
-	api.params["security"] = secString
-	api.remote.Post(api.url, api.params)
-
-	return api.remote, nil
-}
-
-//RequestJSON returns the result of the data api call as a map
-func (api *DataAPI) RequestJSON() (map[string]interface{}, error) {
-	_, err := api.Request()
+	response, err := client.PostForm(url, vals)
 	if err != nil {
-		return map[string]interface{}{}, err
-	}
-	return api.createResponseObject(api.remote)
-}
-
-func (api *DataAPI) createResponseObject(remote *Remote) (map[string]interface{}, error) {
-	result := map[string]interface{}{}
-	if remote == nil {
-		return result, errors.New("Remote object was nil")
+		return result, err
 	}
 
-	result["body"] = remote.Body()
-	result["contentType"] = remote.ContentType()
-	result["statusCode"] = remote.StatusCode()
-	result["timeTaken"] = remote.TimeTaken()
-
-	return result, nil
+	bytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return result, err
+	}
+	result.String = string(bytes)
+	err = json.Unmarshal(bytes, &result.Map)
+	return result, err
 }
+
+//DataResult ...
+type DataResult struct {
+	String string
+	Map    map[string]interface{}
+}
+
+//M alias to map[string]interface{}
+type M map[string]interface{}
